@@ -1,0 +1,113 @@
+﻿#pragma kernel CSMain
+struct GrassPropertiesStruct
+{
+    float3 position;
+    float height;
+    float width;
+    float tilt;
+    float bend;
+    
+};
+struct GrassParametersStruct
+{
+    float baseHeight;
+    float baseWidth;
+    float tilt;
+    float bend;
+};
+
+AppendStructuredBuffer<GrassPropertiesStruct> GrassProperties;
+
+StructuredBuffer<GrassParametersStruct> GrassParameters;
+
+
+AppendStructuredBuffer<float3> debugbuff;
+
+Texture2D hightMap;
+
+int _Resolution;
+
+float _GrassSpacing;
+
+SamplerState sampler_hightMap;
+
+float2 _TerrainPos;
+
+float2 _TerrainSize;
+
+
+float _TerrainHeight;
+
+
+Texture2D _VoronoiOutPut;
+
+
+float3 getTransformedVertex(float3 vertex, float2 uv)
+{
+   
+    float height = hightMap.SampleLevel(sampler_hightMap, uv, 0).x;
+    
+    float worldHeight = height * _TerrainHeight;
+    
+    vertex.y += worldHeight;
+    return vertex;
+
+}
+
+float rand(float3 co)
+{
+    return frac(sin(dot(co.xyz, float3(33.9898, 44.233, 55.539))) * 4561.456);
+}
+
+float remap0_1Neg11(float value)
+{
+    return (value * 2) - 1;
+
+}
+
+
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x < _Resolution && id.y < _Resolution)
+    {
+        float3 position = float3(id.x, 0, id.y) * _GrassSpacing + float3(_TerrainPos.x, 0, _TerrainPos.y);
+        float2 uv = (position.xz - _TerrainPos) / _TerrainSize;
+        uv = clamp(uv, 0, 1);
+
+        int2 texSize;
+        _VoronoiOutPut.GetDimensions(texSize.x, texSize.y);
+        int2 pixelCoord = int2(uv.x * (texSize.x - 1), uv.y * (texSize.y - 1));
+        pixelCoord = clamp(pixelCoord, int2(0, 0), texSize - 1);
+
+        float4 voronoiData = _VoronoiOutPut.Load(int3(pixelCoord, 0));
+        float2 clumpCentreWorld = voronoiData.yz * _TerrainSize + _TerrainPos;
+        
+        int clumpGrassID = (int)voronoiData.x;
+        
+
+        float pullToCentre = 0.5;
+        position.xz = lerp(position.xz, clumpCentreWorld, pullToCentre);
+
+        float2 newUV = (position.xz - _TerrainPos) / _TerrainSize;
+        float3 raisedVertex = getTransformedVertex(position, newUV);
+
+        GrassParametersStruct GrassParameter;
+        
+        GrassParameter = GrassParameters[clumpGrassID];
+        GrassPropertiesStruct Output;
+        Output.position = raisedVertex;
+        
+        
+        Output.width = GrassParameter.baseWidth + remap0_1Neg11(rand(id.xyx));
+        Output.height = GrassParameter.baseHeight + remap0_1Neg11(rand(id.yxy));
+        
+        Output.tilt = GrassParameter.tilt;
+        Output.bend = GrassParameter.bend;
+        
+        
+        GrassProperties.Append(Output);
+    }
+    
+}
