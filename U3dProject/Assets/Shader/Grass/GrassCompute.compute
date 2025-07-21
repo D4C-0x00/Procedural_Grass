@@ -1,0 +1,64 @@
+#pragma kernel CSMain
+
+struct GrassComputeOutPut
+{
+    float3 position;
+};
+
+
+struct GrassComputeConfig
+{
+    
+    int _GrassDensity;
+    float _GrassSpacing;
+    float width;
+    float height;
+    
+};
+
+
+
+AppendStructuredBuffer<GrassComputeOutPut> _GrassComputeOutputs;
+
+
+
+Texture2D _TerrainHeightMap;
+
+SamplerState sampler_TerrainHeightMap;
+
+StructuredBuffer<GrassComputeConfig> _config;
+
+
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    GrassComputeConfig cfg = _config[0];
+    
+    
+    if (id.x < cfg._GrassDensity && id.y < cfg._GrassDensity)
+    {
+        float3 position = float3(id.x, 0, id.y) * cfg._GrassSpacing;
+        
+        
+        float2 uv = position.xz / float2(cfg.width, cfg.height);
+        
+        uv = clamp(uv, 0, 1);
+        
+        
+        float height = _TerrainHeightMap.SampleLevel(sampler_TerrainHeightMap, uv, 0).r;
+        
+        
+        position.y = height;
+        
+        GrassComputeOutPut output;
+        
+        
+        output.position = position;
+        
+        _GrassComputeOutputs.Append(output);
+
+        
+    }
+
+}
