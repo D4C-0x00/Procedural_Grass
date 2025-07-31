@@ -10,3 +10,12 @@ public class GrassRenderSettings
     public int GrassDensity;
 
 }
+[Serializable]
+public struct GrassPatchConfig
+{
+    public float Width;
+    public float Height;
+    public float Tilt;
+    public float Bend;
+
+}

@@ -13,9 +13,6 @@ Shader "Custom/ClumpingVoronoi"
             #include "UnityCG.cginc"
 
 
-        
-
-
             struct appdata
             {
               float4 vertex:POSITION;
@@ -59,7 +56,7 @@ Shader "Custom/ClumpingVoronoi"
                      if(dis<minDist)
                      {
                          minDist=dis;
-                         id=j;
+                         id=fmod(j,4);
                          Centre=mix;
                      }
                  }

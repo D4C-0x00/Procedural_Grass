@@ -3,6 +3,10 @@
 struct GrassComputeOutPut
 {
     float3 position;
+    float height;
+    float width;
+    float tilt;
+    float bend;
 };
 
 
@@ -11,9 +15,18 @@ struct GrassComputeConfig
     
     int _GrassDensity;
     float _GrassSpacing;
-    float width;
-    float height;
+    float terrainSizeX;
+    float terrainSizeZ;
+    float terrainSizeY;
     
+};
+
+struct GrassPatchConfig
+{
+    float Grasswidth;
+    float Grassheight;
+    float Tilt;
+    float Bend;
 };
 
 
@@ -28,35 +41,109 @@ SamplerState sampler_TerrainHeightMap;
 
 StructuredBuffer<GrassComputeConfig> _config;
 
+StructuredBuffer<GrassPatchConfig> _grassPatchConfigs;
 
 
-[numthreads(8,8,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+Texture2D _VoronoiTextureMap;
+SamplerState sampler_VoronoiTextureMap;
+
+float2 hashwithoutsine22(float2 p)
 {
+    float3 p3 = frac(p.xyx * float3(0.123, 0.456, 0.789));
+    
+    p3 += dot(p3, p3.yzx + 888);
+    
+    return frac(float2(p3.x*p3.z, p3.y*p3.z));
+}
+
+float3 getTransformedVertex(float3 p)
+{
+    GrassComputeConfig _cfg = _config[0];
+    
+    float2 worlduv = p.xz;
+    
+    float2 uv = worlduv * (1 / float2(_cfg.terrainSizeX, _cfg.terrainSizeZ));
+    
+    float height = _TerrainHeightMap.SampleLevel(sampler_TerrainHeightMap, uv, 0);
+    
+    
+    p.y = height * _cfg.terrainSizeY;
+    
+    return p;
+}
+
+
+
+[numthreads(1,1,1)]
+
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    
     GrassComputeConfig cfg = _config[0];
     
     
     if (id.x < cfg._GrassDensity && id.y < cfg._GrassDensity)
     {
+       
         float3 position = float3(id.x, 0, id.y) * cfg._GrassSpacing;
         
-        
-        float2 uv = position.xz / float2(cfg.width, cfg.height);
-        
-        uv = clamp(uv, 0, 1);
+        float2 hash2 = hashwithoutsine22(float2(id.x, id.y));
         
         
-        float height = _TerrainHeightMap.SampleLevel(sampler_TerrainHeightMap, uv, 0).r;
+        float2 Jitter = ((hash2 * 2) - 1) * 5;
         
         
-        position.y = height;
+        position.xz += Jitter;
+        
+        float2 clumpUv = position.xz * float2(0.5, 0.5);
+        
+        float3 clumpData = _VoronoiTextureMap.SampleLevel(sampler_VoronoiTextureMap, clumpUv, 0);
+        
+        int voronoIndex = clumpData.x;
+        
+        
+        //float height = _TerrainHeightMap.SampleLevel(sampler_TerrainHeightMap, uv, 0).r;
+        
+        
+        float2 clumpCentre = (clumpData.yz + floor(clumpUv));
+        
+        
+        position.xz = lerp(position.xz, clumpCentre,0.1);
+        
+        GrassPatchConfig patch = _grassPatchConfigs[voronoIndex];
+        
+        
+      //  position.y = height * cfg.terrainSizeY;
+        
+       
+        position = getTransformedVertex(position);
+        
+        
+        
+        
+        
+        float2 clumpHash = hashwithoutsine22(clumpCentre);
+        
+        
+        float2 sharedClumpFacing = normalize(tan((clumpHash + float2(0.13, 1.111)) * 2 - 1));
+        
+        
+        float2 bladeFacing = normalize(hashwithoutsine22(id.xy) * 2 - 1);
+        
+        
+        
+        
         
         GrassComputeOutPut output;
         
         
         output.position = position;
-        
+        output.width = patch.Grasswidth;
+        output.height = patch.Grassheight;
+        output.tilt = patch.Tilt;
+        output.bend = patch.Bend;
         _GrassComputeOutputs.Append(output);
+        
 
         
     }

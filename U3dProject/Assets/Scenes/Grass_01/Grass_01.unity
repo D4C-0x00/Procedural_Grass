@@ -172,7 +172,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
+  near clip plane: 0.01
   far clip plane: 1000
   field of view: 60
   orthographic: 0
@@ -200,7 +200,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 69851873}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalPosition: {x: 0, y: 80, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -333,11 +333,28 @@ MonoBehaviour:
   Terrain: {fileID: 1975859804}
   GrassCompute: {fileID: 7200000, guid: 3c3ae90dc4de29f48a3a15dd4e1ea7ea, type: 3}
   GrassMaterial: {fileID: 2100000, guid: ba400a166ac81d744aff0ef749f5d1da, type: 2}
+  GrassMesh: {fileID: 8254687373856176130, guid: d66024881c48c4541a117a6fa221de8d, type: 3}
+  VoronoiMat: {fileID: 2100000, guid: 70c8a32034169854891197a1383032fd, type: 2}
   GrassSettings:
-    GrassDensity: 500
-  _grassInstanceBounds:
-    m_Center: {x: 0, y: 0, z: 0}
-    m_Extent: {x: 0, y: 0, z: 0}
+    GrassDensity: 200
+  GrassPatchConfigs:
+  - Width: 0.5
+    Height: 2
+    Tilt: 0.7
+    Bend: 1
+  - Width: 0.7
+    Height: 1.2
+    Tilt: 0.6
+    Bend: 1
+  - Width: 0.3
+    Height: 0.8
+    Tilt: 0.7
+    Bend: 1
+  - Width: 0.8
+    Height: 1.3
+    Tilt: 0.9
+    Bend: 1
+  _voronoiRenderMap: {fileID: 0}
 --- !u!4 &1791477692
 Transform:
   m_ObjectHideFlags: 0
