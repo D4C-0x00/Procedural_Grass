@@ -1,0 +1,137 @@
+#pragma kernel CSMain
+struct GrassBlade
+{
+    float3 position;
+    float BaseHeight;
+    float BaseWidth;
+    
+    float BaseTilt;
+
+    float BaseBend;
+    float angle;
+};
+
+struct ClumpingConfigStruct
+{
+    float PullToCenter;
+    float BaseHeight;
+    float BaseWidth;
+    float BaseTilt;
+    float BaseBend;
+};
+
+
+float _GrassDensity;
+float3 _TerrainSize;
+
+Texture2D _TerrainHeightMap;
+
+SamplerState sampler_TerrainHeightMap;
+
+AppendStructuredBuffer<GrassBlade> _GrassBlades;
+StructuredBuffer<ClumpingConfigStruct> _ClumpingConfig;
+
+
+Texture2D _ClumpVoronoiMap;
+
+SamplerState sampler_ClumpVoronoiMap{
+    AddressU = Wrap;
+    AddressV = Wrap;
+};
+
+
+
+float3 getTransformedVertex(float3 p)
+{
+    float2 uv = float2(p.x / _TerrainSize.x, p.z / _TerrainSize.z);
+
+    float height = _TerrainHeightMap.SampleLevel(sampler_TerrainHeightMap, uv,0).r;
+    
+    p.y = height * _TerrainSize.y;
+    
+    return p;
+}
+float2 hashwithoutsine22(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * float3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x < _GrassDensity && id.y < _GrassDensity)
+    {
+        
+        float3 position = float3(id.x, 0, id.y);
+        
+        float WidthSpace = _TerrainSize.x / _GrassDensity;
+        
+        float lengthidspace = _TerrainSize.z / _GrassDensity;
+        
+        position.x *= WidthSpace;
+       
+        position.z *= lengthidspace;
+        
+        
+        float2 hash = hashwithoutsine22(id.xy);
+
+        //Jitter xz
+        float2 jitter = ((hash * 2) - 1) * 5;
+
+        position.xz += jitter;
+        
+        
+        
+        float2 clumpUv = position.xz * float2(0.1, 0.1); //float2(position.x / _TerrainSize.x, position.z / _TerrainSize.z);
+        
+        
+        float3 clumpData = _ClumpVoronoiMap.SampleLevel(sampler_ClumpVoronoiMap, clumpUv,0).xyz;
+        
+        
+        float ClumpingConfigIndex = clumpData.x;
+        
+        ClumpingConfigStruct clumpconfig = _ClumpingConfig[(int) ClumpingConfigIndex];
+        
+        
+        float2 clumpCentre = (clumpData.yz + floor(clumpUv)) / float2(0.1, 0.1);
+        
+        
+        //float2 clumpCentre = 
+        
+       // position.xz = ;
+        
+        position.xz = lerp(position.xz, clumpCentre, clumpconfig.PullToCenter);
+        
+        position = getTransformedVertex(position);
+       
+      
+        
+        float2 clumpHash = hashwithoutsine22(clumpCentre);
+        
+        float2 sharedClumpFacing = normalize(tan((clumpHash + float2(0.13, 1.111)) * 2 - 1));
+        
+        float2 bladeFacing = normalize(hashwithoutsine22(id.xy) * 2 - 1);
+        
+        
+        float2 combinedFacing = normalize(lerp(bladeFacing, sharedClumpFacing, 0));
+        
+        
+        bladeFacing = combinedFacing;
+        
+        float angle = atan2(bladeFacing.y, bladeFacing.x);
+        
+        GrassBlade output;
+        
+        output.position = position;
+        output.BaseHeight = clumpconfig.BaseHeight;
+        output.BaseWidth = clumpconfig.BaseWidth;
+        output.BaseTilt = clumpconfig.BaseTilt;
+        output.BaseBend = clumpconfig.BaseBend;
+        output.angle = angle;
+        _GrassBlades.Append(output);
+        
+    }
+
+}
